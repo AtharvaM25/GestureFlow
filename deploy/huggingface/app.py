@@ -30,7 +30,7 @@ with gr.Blocks(title="GestureFlow API") as status_page:
         "[GestureFlow](https://github.com/AtharvaM25/Hand_Recognition). "
         "Interactive API docs: [/docs](/docs). Health: [/api/v1/health](/api/v1/health).")
 
-app = gr.mount_gradio_app(api, status_page, path="/demo")
+app = gr.mount_gradio_app(api, status_page, path="/demo", ssr_mode=False)
 
 if __name__ == "__main__":
     # one worker: the rate limits are kept in memory (docs/API.md)
