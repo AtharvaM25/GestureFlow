@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 import gradio as gr
+import spaces
 import uvicorn
 from alembic import command
 from alembic.config import Config
@@ -32,7 +33,16 @@ with gr.Blocks(title="GestureFlow API") as status_page:
 
 app = gr.mount_gradio_app(api, status_page, path="/demo", ssr_mode=False)
 
+
+@spaces.GPU
+def _zerogpu_registration():
+    return None
+
+
 if __name__ == "__main__":
+    zerogpu_startup = getattr(spaces.zero, "startup", None)
+    if zerogpu_startup is not None:
+        zerogpu_startup()
     # one worker: the rate limits are kept in memory (docs/API.md)
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "7860")),
                 proxy_headers=True, forwarded_allow_ips="*")
