@@ -157,9 +157,9 @@ packaging==26.3
     #   langchain-core
     #   langsmith
     #   matplotlib
-pandas==3.0.6
+pandas==2.3.3
     # via gestureflow
-pillow==12.3.0
+pillow==11.3.0
     # via matplotlib
 psycopg==3.3.6
     # via gestureflow
@@ -167,7 +167,7 @@ psycopg-binary==3.3.6 ; implementation_name != 'pypy'
     # via psycopg
 pycparser==3.0 ; implementation_name != 'PyPy'
     # via cffi
-pydantic==2.13.5
+pydantic==2.11.10
     # via
     #   fastapi
     #   groq
@@ -175,7 +175,7 @@ pydantic==2.13.5
     #   langsmith
     #   ollama
     #   pydantic-settings
-pydantic-core==2.46.5
+pydantic-core==2.33.2
     # via pydantic
 pydantic-settings==2.15.0
     # via gestureflow
@@ -222,7 +222,7 @@ sqlalchemy==2.1.2
     # via
     #   alembic
     #   gestureflow
-starlette==1.7.0
+starlette==0.52.1
     # via fastapi
 sympy==1.14.0
     # via torch
@@ -277,7 +277,7 @@ uvloop==0.23.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
     # via uvicorn
 watchfiles==1.3.0
     # via uvicorn
-websockets==17.1
+websockets==15.0.1
     # via
     #   langsmith
     #   uvicorn
