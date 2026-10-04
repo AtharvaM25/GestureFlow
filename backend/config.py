@@ -11,9 +11,11 @@ from gestureflow.paths import EVAL_REPORT, MODEL_PATH, REPO
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="GESTUREFLOW_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="GESTUREFLOW_", env_file=".env", extra="ignore")
 
-    env: str = "development"                 # "production" makes a JWT secret mandatory
+    # "production" makes a JWT secret mandatory
+    env: str = "development"
 
     # SQLite needs no setup, so it's the default for running locally. Online, point this at
     # PostgreSQL (Neon, Supabase, Docker Compose); the code and migrations are the same.
@@ -33,10 +35,12 @@ class Settings(BaseSettings):
     # Sentence generation. "ollama" runs the model on this machine (no key needed);
     # "groq" calls Groq's hosted API with your key; "none" turns the feature off.
     sentence_provider: Literal["ollama", "groq", "none"] = "ollama"
-    sentences_per_hour: int = 20             # per user, so one person can't use up the quota
+    # per user, so one person can't use up the quota
+    sentences_per_hour: int = 20
     ollama_model: str = "gemma3:4b"
-    ollama_url: str | None = None            # None -> Ollama's default, http://localhost:11434
-    groq_model: str = "llama-3.1-8b-instant"
+    # None -> Ollama's default, http://localhost:11434
+    ollama_url: str | None = None
+    groq_model: str = "openai/gpt-oss-20b"
     groq_api_key: str = ""
 
     @field_validator("database_url")
@@ -53,7 +57,8 @@ class Settings(BaseSettings):
         if self.jwt_secret:
             return self.jwt_secret
         if self.env == "production":
-            raise RuntimeError("GESTUREFLOW_JWT_SECRET must be set in production")
+            raise RuntimeError(
+                "GESTUREFLOW_JWT_SECRET must be set in production")
         return _dev_secret()
 
 

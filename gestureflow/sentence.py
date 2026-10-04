@@ -3,7 +3,7 @@ Committed letters -> a readable sentence, via an LLM.
 
 Two providers, same prompt:
   ollama  a model running on this machine (default: gemma3:4b). No key; nothing leaves the PC.
-  groq    Groq's hosted API (default: llama-3.1-8b-instant). Needs an API key; used online,
+  groq    Groq's hosted API (default: openai/gpt-oss-20b). Needs an API key; used online,
           where there is no Ollama. Only the letters and the instruction below are sent.
 """
 
@@ -23,9 +23,10 @@ def make_llm(provider="ollama", model=DEFAULT_MODEL, base_url=None, api_key=None
         return OllamaLLM(model=model, **({"base_url": base_url} if base_url else {}))
     if provider == "groq":
         if not api_key:
-            raise RuntimeError("Groq needs an API key (GESTUREFLOW_GROQ_API_KEY)")
+            raise RuntimeError(
+                "Groq needs an API key (GESTUREFLOW_GROQ_API_KEY)")
         from langchain_groq import ChatGroq
-        return ChatGroq(model=model, api_key=api_key, max_tokens=120, temperature=0.2)
+        return ChatGroq(model=model, api_key=api_key, max_tokens=512, temperature=0.2, reasoning_effort="low" if model.startswith("openai/gpt-oss") else None)
     raise ValueError(f"unknown sentence provider {provider!r}")
 
 
@@ -39,5 +40,6 @@ def generate_sentence(letters, model=DEFAULT_MODEL, base_url=None, provider="oll
     from langchain_core.prompts import PromptTemplate
 
     llm = make_llm(provider, model, base_url, api_key)
-    chain = PromptTemplate(template=PROMPT, input_variables=["input"]) | llm | StrOutputParser()
+    chain = PromptTemplate(template=PROMPT, input_variables=[
+                           "input"]) | llm | StrOutputParser()
     return chain.invoke({"input": letters}).strip()

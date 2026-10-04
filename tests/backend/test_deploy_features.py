@@ -24,7 +24,8 @@ def test_hosted_postgres_urls_use_psycopg(given):
 
 
 def test_sqlite_url_untouched():
-    assert Settings(database_url="sqlite:///x.db").database_url == "sqlite:///x.db"
+    assert Settings(
+        database_url="sqlite:///x.db").database_url == "sqlite:///x.db"
 
 
 # ------------------------------------------------------------ delete account
@@ -58,16 +59,19 @@ def test_delete_account_removes_everything(client, token, auth):
 
 
 def test_delete_account_needs_the_password(client, auth):
-    r = client.request("DELETE", f"{API}/auth/me", headers=auth, json={"password": "wrong-pass-1"})
+    r = client.request(
+        "DELETE", f"{API}/auth/me", headers=auth, json={"password": "wrong-pass-1"})
     assert r.status_code == 401
     assert count(User) == 1
 
 
 def test_delete_only_your_own_account(client, auth):
     register_and_login(client, "other@example.com", "other-password-1")
-    client.request("DELETE", f"{API}/auth/me", headers=auth, json={"password": "correct-horse-1"})
+    client.request("DELETE", f"{API}/auth/me",
+                   headers=auth, json={"password": "correct-horse-1"})
     with get_sessionmaker()() as s:
-        assert [u.email for u in s.scalars(select(User))] == ["other@example.com"]
+        assert [u.email for u in s.scalars(select(User))] == [
+            "other@example.com"]
 
 
 # ---------------------------------------------------------------- sentences
@@ -78,7 +82,8 @@ def new_session(client, auth):
 def test_provider_none_turns_sentences_off(client, auth, monkeypatch):
     from backend.config import get_settings
     monkeypatch.setattr(get_settings(), "sentence_provider", "none")
-    r = client.post(f"{API}/sessions/{new_session(client, auth)}/sentence", headers=auth)
+    r = client.post(
+        f"{API}/sessions/{new_session(client, auth)}/sentence", headers=auth)
     assert r.status_code == 503 and "turned off" in r.json()["detail"]
     assert client.get(f"{API}/health").json()["sentence_provider"] == "none"
 
@@ -100,11 +105,13 @@ def test_provider_settings_reach_the_llm_call(client, auth, monkeypatch):
     import backend.api.sessions as sessions_api
     from backend.config import get_settings
     calls = []
-    monkeypatch.setattr(sessions_api, "generate_sentence", lambda *a: calls.append(a) or "Hi.")
+    monkeypatch.setattr(sessions_api, "generate_sentence",
+                        lambda *a: calls.append(a) or "Hi.")
     monkeypatch.setattr(get_settings(), "sentence_provider", "groq")
     monkeypatch.setattr(get_settings(), "groq_api_key", "gsk_test")
-    client.post(f"{API}/sessions/{new_session(client, auth)}/sentence", headers=auth)
-    assert calls == [([], "llama-3.1-8b-instant", None, "groq", "gsk_test")]
+    client.post(
+        f"{API}/sessions/{new_session(client, auth)}/sentence", headers=auth)
+    assert calls == [([], "openai/gpt-oss-20b", None, "groq", "gsk_test")]
 
 
 def test_sentences_are_limited_per_user(client, auth, monkeypatch):
@@ -126,6 +133,6 @@ def test_sentences_are_limited_per_user(client, auth, monkeypatch):
 def test_make_llm_rejects_unknown_provider_and_missing_key():
     from gestureflow.sentence import make_llm
     with pytest.raises(RuntimeError, match="API key"):
-        make_llm("groq", "llama-3.1-8b-instant", api_key="")
+        make_llm("groq", "openai/gpt-oss-20b", api_key="")
     with pytest.raises(ValueError):
         make_llm("openai")

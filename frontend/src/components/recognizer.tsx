@@ -268,7 +268,7 @@ export function Recognizer({ guest = false }: { guest?: boolean }) {
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 503
-          ? "Sentence generation needs a local Ollama server with gemma3:4b pulled."
+          ? `Sentence generation is unavailable right now (${e.message}).`
           : e instanceof Error
             ? e.message
             : "Sentence generation failed.",
