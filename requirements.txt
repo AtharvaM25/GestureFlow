@@ -1,17 +1,3 @@
-# Exact versions for every package, direct and transitive, for Python 3.12.
-# Generated from uv.lock, so pip and uv install the same tree:
-#
-#     uv export --no-hashes --no-dev --no-emit-project --no-header -o requirements.txt
-#
-# Do not edit by hand. Change pyproject.toml, run `uv lock`, then regenerate this file
-# (and keep this header, including the index line below).
-#
-# Install:  python -m pip install -r requirements.txt   (Python 3.12 required)
-# Lines ending in `; sys_platform == ...` apply only on that OS; pip skips the rest.
-
-# Linux uses the CPU-only torch build, which lives on PyTorch's index, not PyPI.
---extra-index-url https://download.pytorch.org/whl/cpu
-
 absl-py==2.5.0
     # via mediapipe
 alembic==1.20.0
@@ -244,9 +230,9 @@ tenacity==9.1.4
     # via langchain-core
 threadpoolctl==3.7.0
     # via scikit-learn
-torch==2.14.1 ; sys_platform != 'linux'
+torch==2.13.0 ; sys_platform != 'linux'
     # via gestureflow
-torch==2.14.1+cpu ; sys_platform == 'linux'
+torch==2.13.0+cpu ; sys_platform == 'linux'
     # via gestureflow
 truststore==0.10.4 ; sys_platform != 'emscripten'
     # via
