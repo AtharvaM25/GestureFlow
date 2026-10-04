@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { SiteHeader } from "@/components/site-header";
 import { AuthProvider } from "@/lib/auth";
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
   description: "Real-time hand-sign recognition. Camera frames stay on your device; only hand landmarks are sent.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: {children:ReactNode}) {
   return (
     <html lang="en" className={`dark ${sans.variable} ${mono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-background font-sans text-foreground">
