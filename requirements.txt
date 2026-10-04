@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 absl-py==2.5.0
     # via mediapipe
 alembic==1.20.0
