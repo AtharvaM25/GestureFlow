@@ -4,9 +4,7 @@
 #
 # Then open http://localhost:3000. Sentence generation uses Ollama on the host machine
 # if it is running (http://host.docker.internal:11434); everything else works without it.
-#
-# No Redis: nothing needs it yet. Rate limiting is in-process, which is correct for the
-# single API worker below. Add Redis when running more than one worker.
+
 
 services:
   db:
