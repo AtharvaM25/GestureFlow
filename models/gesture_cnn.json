@@ -1,0 +1,36 @@
+{
+  "labels": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "S",
+    "T",
+    "U",
+    "V",
+    "W",
+    "X",
+    "Y",
+    "Z"
+  ],
+  "preprocessing": {
+    "canvas": 128,
+    "margin": 0.12,
+    "align_rotation": false
+  },
+  "source_checkpoint_sha256": "7bf874ea8e6e14b24b3aa303f55af80d8da2785eeccf51980d712ad882fc4ea9"
+}

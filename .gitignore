@@ -1,0 +1,35 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+
+data.py
+LandmarkExtractor.py
+rough.py
+test.py
+
+.env
+# MediaPipe downloads this on first run (7.6MB); no need to track it.
+hand_landmarker.task
+
+# Local SQLite database (created by `alembic upgrade head`)
+/data/gestureflow.db
+
+# Evaluation-only checkpoints (see gestureflow/calibration_eval.py)
+/models/held_out_*.pt
+
+# Personal notes (resume bullets, to-do list): kept on this PC, not published
+/notes/
+
+# Local tool settings
+/.claude/
+
+# Build output of deploy/huggingface/build_space.py
+/out/

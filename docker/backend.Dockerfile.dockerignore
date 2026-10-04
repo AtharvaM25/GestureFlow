@@ -1,0 +1,12 @@
+# Build context is the repo root; the API image copies only what it needs.
+.git
+.venv
+venv
+**/__pycache__
+**/.pytest_cache
+frontend
+data
+tests
+models/hand_landmarker.task
+.env
+.claude

@@ -1,0 +1,12 @@
+# Build context is the repo root; the web image needs only frontend/ and the ONNX model.
+*
+!frontend
+!models/gesture_cnn.onnx
+!models/gesture_cnn.json
+frontend/node_modules
+frontend/.next
+frontend/public/mediapipe
+frontend/public/ort
+frontend/public/edge
+frontend/.env*
+frontend/tsconfig.tsbuildinfo

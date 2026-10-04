@@ -1,0 +1,64 @@
+# GestureFlow: PostgreSQL + API + web app.
+#
+#   GESTUREFLOW_JWT_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(48))") docker compose up --build
+#
+# Then open http://localhost:3000. Sentence generation uses Ollama on the host machine
+# if it is running (http://host.docker.internal:11434); everything else works without it.
+#
+# No Redis: nothing needs it yet. Rate limiting is in-process, which is correct for the
+# single API worker below. Add Redis when running more than one worker.
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: gestureflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gestureflow}
+      POSTGRES_DB: gestureflow
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gestureflow -d gestureflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    environment:
+      GESTUREFLOW_ENV: production
+      GESTUREFLOW_DATABASE_URL: postgresql+psycopg://gestureflow:${POSTGRES_PASSWORD:-gestureflow}@db:5432/gestureflow
+      GESTUREFLOW_JWT_SECRET: ${GESTUREFLOW_JWT_SECRET:?set GESTUREFLOW_JWT_SECRET (see the comment at the top of docker-compose.yml)}
+      GESTUREFLOW_CORS_ORIGINS: '["http://localhost:3000"]'
+      # ollama (on the host machine) by default; set GESTUREFLOW_SENTENCE_PROVIDER=groq and
+      # GESTUREFLOW_GROQ_API_KEY in your shell or .env to use Groq instead
+      GESTUREFLOW_SENTENCE_PROVIDER: ${GESTUREFLOW_SENTENCE_PROVIDER:-ollama}
+      GESTUREFLOW_GROQ_API_KEY: ${GESTUREFLOW_GROQ_API_KEY:-}
+      GESTUREFLOW_OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

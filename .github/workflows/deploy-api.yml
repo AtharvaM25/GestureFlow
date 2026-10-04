@@ -1,0 +1,59 @@
+# Deploys the API to a Hugging Face Space (free Gradio SDK, runs deploy/huggingface/app.py)
+# whenever main changes.
+#
+# One-time setup (docs/DEPLOY.md):
+#   repo Settings -> Secrets and variables -> Actions
+#     secret    HF_TOKEN   a Hugging Face token with "write" access
+#     variable  HF_SPACE   e.g. your-username/gestureflow-api
+# Until both exist, this workflow skips itself.
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check configuration
+        id: config
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE" ]; then
+            echo "HF_TOKEN secret or HF_SPACE variable not set -- skipping deploy"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.config.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+      - name: Build the Space folder
+        if: steps.config.outputs.ready == 'true'
+        run: python deploy/huggingface/build_space.py out/space
+      - name: Upload to Hugging Face
+        if: steps.config.outputs.ready == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          pip install --quiet "huggingface_hub>=0.25"
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          HfApi(token=os.environ["HF_TOKEN"]).upload_folder(
+              repo_id=os.environ["HF_SPACE"], repo_type="space", folder_path="out/space",
+              commit_message=f"Deploy {os.environ['GITHUB_SHA'][:7]}",
+              delete_patterns=["*", "**/*"],   # remove files that no longer exist in the repo
+          )
+          print("uploaded; the Space now rebuilds (watch its Logs tab)")
+          EOF
