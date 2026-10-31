@@ -21,7 +21,7 @@ skin tone never reach the model.
 - **Pose normalization** — hand position and distance from camera are removed before classification
 - **Landmark-space augmentation** — rotation, scale, perspective and joint noise applied to the coordinates, not to pixels
 - **Confidence gating and temporal smoothing** — majority vote over recent frames plus a stability counter before a letter is committed
-- **Sentence generation** — committed letters are sent to a local Ollama model for grammatical correction
+- **Sentence generation** — committed letters are joined into one string and sent to an LLM (local Ollama, or Groq when deployed), prompted to split it into words, recover missed letters and punctuate it
 - **Leakage-free evaluation** — a whole recording session is held out as the test set, and a leakage detector refuses to train if any session sits on both sides
 - **Confusion-aware data collection** — the collector ranks letters by how badly they fail on an unseen session and tells you what to record next; every sample is written to disk immediately
 - **Dataset inspection tool** — renders the mean skeleton per class and reports per-class consistency
@@ -30,7 +30,7 @@ skin tone never reach the model.
 - **Web app** — Next.js frontend with in-browser hand tracking; only landmarks travel to the server, over a WebSocket
 - **FastAPI backend** — versioned REST API, live WebSocket recognition, JWT login with Argon2-hashed passwords, login rate limit
 - **Database with migrations** — SQLAlchemy + Alembic; SQLite locally (zero setup), PostgreSQL in Docker; camera frames and landmark coordinates are never stored
-- **Edge mode** — the model also runs inside the browser (ONNX Runtime Web), so nothing leaves the device; it gives the same letter as the server on 99.90% of samples
+- **Edge mode** — the model also runs inside the browser (ONNX Runtime Web), so nothing leaves the device; it gives the same letter as the server on 99.94% of samples
 - **Personal calibration** — sign each letter a few times once and recognition adapts to your hand; on an unseen session it raised accuracy from 92.7% to 97.3%
 - **Analytics dashboard** — your letters per day and most-signed letters, over 7, 30 or 90 days
 - **Text-to-speech** — a Speak button reads the text or the generated sentence aloud
@@ -56,9 +56,10 @@ The result is drawn as a 128×128 colour skeleton and handed to a CNN.
 Because the nuisance variation is removed arithmetically rather than learned, the model needs far
 less data than a pixel classifier would.
 
-**Sentence generation.** Recognized letters accumulate into a list. On exit, that list goes to a
-local Ollama model through LangChain, which is prompted to produce a grammatically correct
-sentence from the unpunctuated sequence.
+**Sentence generation.** Recognized letters accumulate into a list. On exit, the list is joined into
+one lowercase string (`helohwareyu`) and sent through LangChain to an LLM (local Ollama, or Groq
+when deployed) with a few-shot prompt that splits it into words, recovers missed letters and
+returns one punctuated sentence.
 
 ---
 
@@ -80,7 +81,7 @@ Colours identify fingers: grey wrist, red thumb, orange index, green middle, blu
 
 `spread` is the average distance of a sample from its class mean — higher means the gesture was
 held less consistently during capture. `session gap` is the distance between the `day1` mean shape
-and the `day2` mean shape. Both are printed by `gestureflow/preview.py`.
+and the `day2` mean shape. Both are printed by `python -m gestureflow.preview --sessions day1 day2`.
 
 | Class | Samples | Spread | Session gap |
 | ----- | ------- | ------ | ----------- |
@@ -111,7 +112,7 @@ and the `day2` mean shape. Both are printed by `gestureflow/preview.py`.
 | Y     | 108     | 0.0628 | 0.0620      |
 | Z     | 108     | 0.0418 | 0.0351      |
 
-**Total: 2,948 samples across 26 classes, captured in two sessions (`day1`, `day2`).**
+**Total: 2,948 samples across 26 classes in the first two sessions (`day1`, `day2`). A third session (`day3`, 1,861 samples) brings the dataset to 4,809.**
 
 M and N have roughly four times the spread of the steadiest classes. Both are held well off
 vertical with the thumb tucked under the fingers, which is where MediaPipe's landmark placement
@@ -140,14 +141,14 @@ endpoints, the WebSocket protocol and the security model.
 
 **Two modes.** Switch on the Recognize page:
 
-| Mode | What runs where | What leaves your device |
-| --- | --- | --- |
-| Server | Hand tracking in the browser, the model on the server | 21 landmarks per frame |
-| Edge | Both in the browser (MediaPipe + ONNX Runtime Web) | Nothing. No session is saved either |
+| Mode   | What runs where                                       | What leaves your device             |
+| ------ | ----------------------------------------------------- | ----------------------------------- |
+| Server | Hand tracking in the browser, the model on the server | 21 landmarks per frame              |
+| Edge   | Both in the browser (MediaPipe + ONNX Runtime Web)    | Nothing. No session is saved either |
 
 The browser can't run OpenCV, so Edge mode draws the skeleton with a simpler rasterizer.
 Rather than assume that's harmless, `python -m gestureflow.edge` measures it: the same letter
-as the server on **2,945 of 2,948 samples (99.90%)** (`docs/edge_parity.json`). The TypeScript
+as the server on **4,806 of 4,809 samples (99.94%)** (`docs/edge_parity.json`). The TypeScript
 version is checked to be pixel-identical to the Python reference on every sample
 (`pnpm test:edge`).
 
@@ -180,7 +181,7 @@ softmax → (label, confidence)
    ↓
 temporal smoothing         majority vote over last 7 frames
    ↓
-stability gate             confidence > 0.90 for 15 consecutive frames
+stability gate             confidence > 0.85 for 9 consecutive frames
    ↓
 letter appended to sentence list
    ↓
@@ -223,11 +224,14 @@ in a flat 2D drawing.
 **6. Confidence filtering.** Below `CONF_SHOW = 0.70` nothing is displayed.
 
 **7. Smoothing and accumulation** (`LetterCommitter` in `gestureflow/core/temporal.py`). Recent predictions go into a 7-frame deque and the majority wins,
-which removes single-frame flicker. A letter is appended only after `COMMIT_FRAMES = 15` consecutive
-frames above `CONF_COMMIT = 0.90`. A green flash confirms the commit.
+which removes single-frame flicker. A letter is appended only after `COMMIT_FRAMES = 9` consecutive
+frames above `CONF_COMMIT = 0.85`. A green flash confirms the commit.
 
-**8. Sentence generation** (`generate_sentence`). The letter list is passed through a LangChain
-chain — `PromptTemplate | OllamaLLM | StrOutputParser` — using `gemma3:4b`.
+**8. Sentence generation** (`generate_sentence`). The letters are joined into one lowercase string
+and passed through a LangChain chain — `PromptTemplate | OllamaLLM | StrOutputParser` — using
+`gemma3:4b`, or `ChatGroq` with `openai/gpt-oss-20b` when `GESTUREFLOW_SENTENCE_PROVIDER=groq`.
+The few-shot prompt asks the model to split the string into words, recover missed letters and
+return only the punctuated sentence.
 
 ---
 
@@ -287,20 +291,25 @@ without retraining fails loudly instead of silently degrading predictions.
 
 ### Measured accuracy
 
-Train on `day1`, test on `day2`, a session the model never saw. Produced by
-`python -m gestureflow.evaluate --hold-out day2 --epochs 25` and stored in
+Train on `day1` + `day2`, test on `day3`, a session the model never saw. Produced by
+`python -m gestureflow.evaluate --hold-out day3 --epochs 25` and stored in
 [`docs/evaluation_report.json`](docs/evaluation_report.json):
 
-| Protocol | Accuracy | Macro F1 |
-| --- | --- | --- |
-| Old split, `day2` on both sides (leaky) | 0.9758 | 0.9744 |
-| **Unseen session** | **0.9417** | **0.9343** |
+| Protocol                                               | Accuracy   | Macro F1   |
+| ------------------------------------------------------ | ---------- | ---------- |
+| Old split, `day2` on both sides (leaky)                | 0.9758     | 0.9744     |
+| Unseen session: train `day1`, test `day2`              | 0.9417     | 0.9343     |
+| **Unseen session: train `day1` + `day2`, test `day3`** | **0.9737** | **0.9740** |
 
-Weakest letters on the unseen session (F1): **K 0.16**, V 0.69, N 0.70, M 0.86. Every other
-letter is at 0.95 or above. K is mostly misread as V, so K, V, N and M are the letters to
-re-record. The gap is data, not model capacity: training accuracy reaches 98% in the same run.
-The leaky figure and the full breakdown are in [`docs/EVALUATION.md`](docs/EVALUATION.md).
-Results vary by about half a point between runs.
+Weakest letters on the unseen `day3` session (F1): **M 0.82**, N 0.83, V 0.87, K 0.95, U 0.95,
+R 0.96. Every other letter is at 0.98 or above. Most errors are two look-alike pairs: M and N
+(23 mix-ups between them) and V read as K (13), plus R read as U (6). K, the weakest letter on
+`day2` (0.16 when trained on `day1` alone, mostly misread as V), reaches 0.95 with two training
+sessions; the two rows use different test days, so this shows that a second session helps rather
+than measuring exactly how much. Training accuracy reaches 99% in the same run, so the remaining
+gap is data, not model capacity. The deployed model is then retrained on all three sessions
+(`python -m gestureflow.train --test-session none`), so this held-out figure is the closest honest
+estimate for it. Results vary by about half a point between runs.
 
 ---
 
@@ -343,7 +352,7 @@ Hand_Recognition/
 ├── alembic.ini                  migration settings
 │
 ├── data/
-│   └── landmarks.csv            dataset: 2,948 rows × 46 columns
+│   └── landmarks.csv            dataset: 4,809 rows × 46 columns
 ├── models/
 │   ├── gesture_cnn.pt           trained weights + labels + preprocessing config
 │   ├── gesture_cnn.onnx/.json   the same model for the browser (Edge mode)
@@ -496,6 +505,7 @@ Run every program from the project folder (with `.venv` activated, or prefix wit
 ### Deploying it online
 
 [`docs/DEPLOY.md`](docs/DEPLOY.md) walks through putting it on the internet for free:
+
 - **Neon** for PostgreSQL
 - **Groq** for sentence generation
 - a free **Hugging Face Space** (Gradio SDK) for the API, deployed automatically from GitHub
@@ -583,7 +593,7 @@ pnpm lint; pnpm typecheck; pnpm test:edge; pnpm build
 ```
 
 `pnpm test:edge` checks the browser's Edge-mode code against the Python reference: the renderer
-on all 2,948 samples, the letter-commit logic on recorded streams, and the full pipeline through
+on all 4,809 samples, the letter-commit logic on recorded streams, and the full pipeline through
 ONNX Runtime Web.
 
 ---
@@ -617,21 +627,21 @@ loses nothing.
 Re-run `python -m gestureflow.evaluate` after a recording session so the plan reflects the new
 data.
 
-| Argument    | Default                                  | Meaning                               |
-| ----------- | ---------------------------------------- | ------------------------------------- |
-| `--plan`    | —                                        | Print what to record, then exit       |
-| `--label`   | —                                        | Record this one letter                |
-| `--auto`    | —                                        | Record every flagged letter in order  |
-| `--session` | —                                        | Name for this sitting                 |
-| `--target`  | `150`                                    | Samples per letter to aim for         |
-| `--csv`     | `data/landmarks.csv`                     | Output file                           |
-| `--report`  | `docs/evaluation_report.json`            | Per-letter results used for the plan  |
+| Argument    | Default                       | Meaning                              |
+| ----------- | ----------------------------- | ------------------------------------ |
+| `--plan`    | —                             | Print what to record, then exit      |
+| `--label`   | —                             | Record this one letter               |
+| `--auto`    | —                             | Record every flagged letter in order |
+| `--session` | —                             | Name for this sitting                |
+| `--target`  | `150`                         | Samples per letter to aim for        |
+| `--csv`     | `data/landmarks.csv`          | Output file                          |
+| `--report`  | `docs/evaluation_report.json` | Per-letter results used for the plan |
 
 Record every letter in each new sitting, with extra time on the weak ones. If a sitting contains
 only a few letters, the model can learn "these conditions mean one of those letters".
 
 Give each sitting a different `--session` name and change the conditions between them (lighting,
-distance, time of day). The dataset currently holds `day1` and `day2`.
+distance, time of day). The dataset currently holds `day1`, `day2` and `day3`.
 
 Only landmarks are saved. No images are written, so no background is ever stored.
 
@@ -668,10 +678,10 @@ improves, and `gestureflow/live.py` picks it up on the next launch.
 
 **`gestureflow/collect.py`**
 
-| Key | Function                                       |
-| --- | ---------------------------------------------- |
-| `s` | Save one frame                                 |
-| `c` | Toggle burst capture (saves every 3rd frame)   |
+| Key | Function                                        |
+| --- | ----------------------------------------------- |
+| `s` | Save one frame                                  |
+| `c` | Toggle burst capture (saves every 3rd frame)    |
 | `q` | Finish this letter (`--auto` moves to the next) |
 
 **`gestureflow/live.py`**
@@ -704,8 +714,8 @@ until you regenerate it with `python -m tests.golden.regenerate`.
 | Constant        | Default | Meaning                                               |
 | --------------- | ------- | ----------------------------------------------------- |
 | `CONF_SHOW`     | `0.70`  | Minimum confidence to display a prediction            |
-| `CONF_COMMIT`   | `0.90`  | Minimum confidence to count toward a committed letter |
-| `COMMIT_FRAMES` | `15`    | Consecutive stable frames before committing           |
+| `CONF_COMMIT`   | `0.85`  | Minimum confidence to count toward a committed letter |
+| `COMMIT_FRAMES` | `9`     | Consecutive stable frames before committing           |
 | `SMOOTH`        | `7`     | Frames in the majority-vote window                    |
 
 **`gestureflow/paths.py`** — where the dataset, models, report and preview image live.
@@ -741,7 +751,7 @@ detection problem — improve lighting or move your hand fully into frame. A cle
 wrong label is a model problem. Run `python -m gestureflow.collect --plan` to see which letters
 need more data.
 
-**Letters never commit.** Confidence is not reaching 0.90 for 15 straight frames. Hold the gesture
+**Letters never commit.** Confidence is not reaching 0.85 for 9 straight frames. Hold the gesture
 steadier, or lower `CONF_COMMIT`.
 
 ---
@@ -750,15 +760,15 @@ steadier, or lower `CONF_COMMIT`.
 
 - **Static shapes only.** One frame is classified at a time, so gestures defined by motion cannot be represented.
 - **Single hand.** `HandDetector(maxHands=1)`, so two-handed signs are out of scope.
-- **One signer.** All 2,948 samples come from one person's hand. Generalization to other hands is untested.
-- **Two capture sessions.** `day1` and `day2` only, so the range of lighting and camera positions in the data is narrow.
+- **One signer.** All 4,809 samples come from one person's hand. Generalization to other hands is untested.
+- **Three capture sessions.** `day1`, `day2` and `day3` only, so the range of lighting and camera positions in the data is still narrow.
 - **Detection is the weak link.** If MediaPipe misplaces landmarks, the CNN receives a wrong skeleton and cannot recover. The `skeleton` window exists to make this visible.
-- **Weak letters.** K scores F1 0.16 on an unseen session and is mostly read as V; N, V and M are also below 0.90. M and N show roughly four times the landmark spread of the steadiest classes.
+- **Weak letters.** On the unseen `day3` session M (F1 0.82) and N (0.83) are confused with each other, and V (0.87) is misread as K. M and N show roughly four times the landmark spread of the steadiest classes.
 - **Letter-by-letter entry.** There is no word-level model; the LLM only post-processes the string.
 - **Calibration measured in the favourable case.** Calibration and test frames came from the same sitting.
 - **Edge mode skips calibration.** Edge stores nothing, so it uses the base model.
-- **Local LLM dependency.** Sentence generation needs Ollama running locally with `gemma3:4b` pulled.
-- **One test fold.** With two sessions, the unseen-session figure comes from a single held-out sitting. More sessions are needed before it can be reported with a spread.
+- **LLM dependency.** Sentence generation needs Ollama running locally with `gemma3:4b` pulled, or a Groq API key (`GESTUREFLOW_SENTENCE_PROVIDER=groq`).
+- **One test fold.** The unseen-session figure comes from a single held-out sitting (`day3`). With three sessions, `python -m gestureflow.evaluate --epochs 25` can now run all three folds and report a spread.
 
 ---
 
