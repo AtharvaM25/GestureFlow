@@ -1,19 +1,6 @@
 """
 Confusion-aware landmark collector.
 
-Replaces collecter.py's flat `--target 150` per class with a recording plan derived from
-what the model actually gets wrong. Three signals decide what you record next:
-
-  1. cross-session F1   from docs/evaluation_report.json -- how badly the class fails on a
-                        session the model has never seen. This is the honest signal.
-  2. landmark spread    average distance of each sample from its class mean. High spread
-                        means the gesture was held inconsistently during capture.
-  3. session coverage   a class recorded in one sitting has no evidence of generalizing.
-
-Also fixes a data-loss bug in collecter.py: rows accumulated in memory and were written
-only after a clean `q` exit, so Ctrl-C, a crash or closing the window discarded the whole
-sitting. Here every sample is appended to the CSV immediately and fsync'd.
-
     python -m gestureflow.collect --plan                 # what to record, no camera needed
     python -m gestureflow.collect --label K --session day3
     python -m gestureflow.collect --auto --session day3  # walk the priority queue
@@ -41,7 +28,7 @@ CSV_COLS = [f"{a}{i}" for i in range(21) for a in "xy"]
 HEADER = ["label", "session", "timestamp", "seq"] + COORD_COLS
 
 BURST_EVERY = 3
-DEFAULT_TARGET = 150
+DEFAULT_TARGET = 60
 MIN_SESSIONS = 3          # below this a class has no cross-session evidence
 F1_URGENT = 0.80          # cross-session F1 under this is a priority class
 SPREAD_HIGH = 0.12        # above this the gesture was held inconsistently
@@ -79,7 +66,8 @@ def load_f1(report_path: Path) -> tuple[dict[str, float], str | None]:
     try:
         rep = json.loads(report_path.read_text())
     except (json.JSONDecodeError, OSError) as e:
-        print(f"warning: could not read {report_path.name}: {e}", file=sys.stderr)
+        print(
+            f"warning: could not read {report_path.name}: {e}", file=sys.stderr)
         return {}, None
 
     folds = rep.get("folds", {})
@@ -134,7 +122,8 @@ def build_plan(df: pd.DataFrame, f1: dict[str, float], target: int) -> list[Clas
 
 
 def print_plan(needs: list[ClassNeed], note: str | None, target: int) -> None:
-    print(f"Recording plan  (target {target} samples, {MIN_SESSIONS}+ sessions per class)")
+    print(
+        f"Recording plan  (target {target} samples, {MIN_SESSIONS}+ sessions per class)")
     print(f"F1 source: {note or 'NONE -- run python -m gestureflow.evaluate first; '
                                 'prioritizing on spread and session coverage only'}")
     print()
@@ -216,7 +205,8 @@ def capture(label: str, session: str, target: int, csv_path: Path) -> int:
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
-        raise SystemExit("Could not open camera (index 0). Close other apps using it.")
+        raise SystemExit(
+            "Could not open camera (index 0). Close other apps using it.")
 
     detector = hand_detector(max_hands=1)
     burst = False
@@ -243,7 +233,8 @@ def capture(label: str, session: str, target: int, csv_path: Path) -> int:
                 hands, _ = detector.findHands(frame, draw=False)
                 pts = None
                 if hands and hands[0].get("lmList"):
-                    pts = np.asarray(hands[0]["lmList"], dtype=np.float32)[:, :2]
+                    pts = np.asarray(hands[0]["lmList"],
+                                     dtype=np.float32)[:, :2]
 
                 display = frame.copy()
                 if pts is not None:
@@ -251,7 +242,8 @@ def capture(label: str, session: str, target: int, csv_path: Path) -> int:
                         cv2.line(display, tuple(pts[a].astype(int)),
                                  tuple(pts[b].astype(int)), (200, 200, 200), 2)
                     for x, y in pts:
-                        cv2.circle(display, (int(x), int(y)), 4, (0, 0, 255), -1)
+                        cv2.circle(display, (int(x), int(y)),
+                                   4, (0, 0, 255), -1)
 
                 total = existing + writer.n
                 colour = (0, 255, 0) if pts is not None else (0, 0, 255)
@@ -260,7 +252,8 @@ def capture(label: str, session: str, target: int, csv_path: Path) -> int:
                 cv2.putText(display, f"{total} / {target}", (20, 75),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
                 if burst:
-                    cv2.circle(display, (display.shape[1] - 40, 40), 14, (0, 0, 255), -1)
+                    cv2.circle(
+                        display, (display.shape[1] - 40, 40), 14, (0, 0, 255), -1)
                     cv2.putText(display, "REC", (display.shape[1] - 110, 48),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                 if total >= target:
@@ -286,7 +279,8 @@ def capture(label: str, session: str, target: int, csv_path: Path) -> int:
                         print("no hand, nothing saved")
                     else:
                         writer.write(label, session, existing + writer.n, pts)
-                        print(f"saved {existing + writer.n}", end="\r", flush=True)
+                        print(f"saved {existing + writer.n}",
+                              end="\r", flush=True)
         except KeyboardInterrupt:
             print("\ninterrupted -- samples already written are safe")
         finally:
@@ -328,7 +322,8 @@ def main() -> None:
         print(f"warning: session {session!r} already exists in the dataset. Reusing it "
               f"weakens cross-session evaluation -- prefer a new name.\n")
 
-    queue = [args.label] if args.label else [n.label for n in needs if n.priority > 0]
+    queue = [args.label] if args.label else [
+        n.label for n in needs if n.priority > 0]
     if not queue:
         print("nothing to record -- every class meets the targets")
         return
