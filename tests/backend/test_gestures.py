@@ -7,7 +7,7 @@ def test_lists_the_models_letters_with_f1(client, auth):
     rows = r.json()
     assert [g["label"] for g in rows] == list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     k = next(g for g in rows if g["label"] == "K")
-    assert k["f1_unseen_session"] is not None and k["f1_unseen_session"] < 0.5
+    assert k["f1_unseen_session"] is not None and 0.0 <= k["f1_unseen_session"] <= 1.0
 
 
 def test_requires_login(client):

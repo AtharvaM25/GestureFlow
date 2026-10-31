@@ -1,14 +1,14 @@
 {
-  "samples": 2948,
-  "same_letter": 2945,
-  "agreement": 0.999,
+  "samples": 4809,
+  "same_letter": 4806,
+  "agreement": 0.9994,
   "pixels_differing_pct": 0.124,
   "bone_radius": 1.5,
   "disagreements": [
     {
-      "row": 571,
-      "server": "K",
-      "edge": "V"
+      "row": 581,
+      "server": "V",
+      "edge": "K"
     },
     {
       "row": 597,
@@ -16,9 +16,9 @@
       "edge": "V"
     },
     {
-      "row": 2205,
-      "server": "P",
-      "edge": "M"
+      "row": 619,
+      "server": "K",
+      "edge": "V"
     }
   ],
   "note": "Same checkpoint, OpenCV render (server) vs the browser rasterizer (edge)."

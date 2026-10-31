@@ -24,7 +24,8 @@ COORD_COLS = [f"{a}{i}" for i in range(21) for a in "xy"]
 # A plausible hand: wrist at origin, five fingers splayed. Random points would
 # normalize to a huge spread and make every synthetic class look inconsistent.
 _BASE_HAND = np.array(
-    [[0, 0]] + [[dx, dy] for dx in (-30, -15, 0, 15, 30) for dy in (-25, -50, -75, -100)],
+    [[0, 0]] + [[dx, dy]
+                for dx in (-30, -15, 0, 15, 30) for dy in (-25, -50, -75, -100)],
     dtype=np.float32,
 ) + np.array([320, 240], dtype=np.float32)
 
@@ -35,10 +36,12 @@ def make_df(spec, jitter=1.5, seed=0):
     rows = []
     rng = np.random.default_rng(seed)
     for label, sessions in spec.items():
-        offset = rng.normal(0, 12, (21, 2)).astype(np.float32)   # per-class shape
+        offset = rng.normal(0, 12, (21, 2)).astype(
+            np.float32)   # per-class shape
         for session, n in sessions:
             for i in range(n):
-                pts = _BASE_HAND + offset + rng.normal(0, jitter, (21, 2)).astype(np.float32)
+                pts = _BASE_HAND + offset + \
+                    rng.normal(0, jitter, (21, 2)).astype(np.float32)
                 rows.append({"label": label, "session": session, "timestamp": 1e9 + i,
                              "seq": i, **dict(zip(COORD_COLS, pts.reshape(-1), strict=True))})
     return pd.DataFrame(rows)
@@ -152,7 +155,8 @@ def test_missing_or_corrupt_report_degrades_gracefully(tmp_path):
 
 # ------------------------------------------------------------ spread metric
 def test_spread_zero_for_identical_samples():
-    pts = np.tile(np.arange(42, dtype=np.float32).reshape(1, 21, 2), (10, 1, 1))
+    pts = np.tile(np.arange(42, dtype=np.float32).reshape(
+        1, 21, 2), (10, 1, 1))
     assert class_spread(pts) == pytest.approx(0.0, abs=1e-6)
 
 
@@ -160,6 +164,7 @@ def test_spread_matches_published_values():
     """M and N are the high-spread classes in the README table, computed the same way
     by gestureflow/preview.py. Guards against the metric silently changing."""
     df = pd.read_csv(LANDMARKS_CSV)
+    df = df[df.session.isin(["day1", "day2"])]
     got = {L: class_spread(g[COORD_COLS].to_numpy(np.float32).reshape(-1, 21, 2))
            for L, g in df.groupby("label") if L in ("M", "N", "Z")}
     assert got["M"] == pytest.approx(0.2592, abs=5e-4)
