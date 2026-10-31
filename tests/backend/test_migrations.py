@@ -18,6 +18,8 @@ from backend import models  # noqa: F401
 from backend.db import Base, make_engine
 from tests.backend.conftest import GOLDEN, clear_caches, register_and_login
 
+from gestureflow.core.temporal import COMMIT_FRAMES
+
 ALEMBIC_INI = Path(__file__).parents[2] / "alembic.ini"
 PG_URL = os.environ.get("GESTUREFLOW_TEST_PG_URL")
 
@@ -43,7 +45,8 @@ def migrated_url(request, tmp_path, monkeypatch):
 def test_migrations_match_models(migrated_url):
     engine = make_engine(migrated_url)
     with engine.connect() as conn:
-        assert compare_metadata(MigrationContext.configure(conn), Base.metadata) == []
+        assert compare_metadata(
+            MigrationContext.configure(conn), Base.metadata) == []
     engine.dispose()
 
 
@@ -56,9 +59,10 @@ def test_full_flow_on_migrated_database(migrated_url):
         assert client.get("/api/v1/health").json()["database"] == "ok"
         s = client.post("/api/v1/sessions", headers=auth).json()
         with client.websocket_connect("/api/v1/ws/recognition") as conn:
-            conn.send_json({"type": "auth", "token": token, "session_id": s["id"]})
+            conn.send_json(
+                {"type": "auth", "token": token, "session_id": s["id"]})
             conn.receive_json()
-            for _ in range(15):
+            for _ in range(COMMIT_FRAMES):
                 conn.send_json({"type": "frame", "landmarks": case["raw"]})
                 last = conn.receive_json()
         assert last["committed"] == case["label"]

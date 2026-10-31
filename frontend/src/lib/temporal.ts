@@ -2,8 +2,8 @@
 // letters. `pnpm test:edge` replays recorded streams through both and compares every frame.
 
 export const CONF_SHOW = 0.7;
-export const CONF_COMMIT = 0.9;
-export const COMMIT_FRAMES = 15;
+export const CONF_COMMIT = 0.85;
+export const COMMIT_FRAMES = 9;
 export const SMOOTH = 7;
 
 export type Step = { smoothed: string | null; committed: string | null };

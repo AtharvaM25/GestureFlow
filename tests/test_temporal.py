@@ -37,7 +37,7 @@ def reference(frames):
 
 
 def run(frames):
-    c = LetterCommitter()
+    c = LetterCommitter(conf_commit=0.90, commit_frames=15)
     out = []
     for f in frames:
         if f is None:

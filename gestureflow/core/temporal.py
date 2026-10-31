@@ -10,8 +10,8 @@ from collections import Counter, deque
 from dataclasses import dataclass
 
 CONF_SHOW = 0.70        # a frame votes only above this
-CONF_COMMIT = 0.90      # a frame counts toward a commit only above this
-COMMIT_FRAMES = 15      # consecutive agreeing frames needed to commit
+CONF_COMMIT = 0.85      # a frame counts toward a commit only above this
+COMMIT_FRAMES = 9      # consecutive agreeing frames needed to commit
 SMOOTH = 7              # majority vote over this many recent frames
 
 
