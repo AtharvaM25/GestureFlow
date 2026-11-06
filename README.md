@@ -136,8 +136,8 @@ the frame stream, and no landmark coordinates.
 
 **Measured, not claimed.** `python -m backend.bench_ws` streams real landmarks to a running
 server. On the development machine (CPU only), the median server time per frame was 29.1 ms
-(p95 33.0 ms) and the median round trip 31.8 ms. See [`docs/API.md`](docs/API.md) for the
-endpoints, the WebSocket protocol and the security model.
+(p95 33.0 ms) and the median round trip 31.8 ms. Every REST endpoint is listed at `/docs` on a
+running server.
 
 **Two modes.** Switch on the Recognize page:
 
@@ -156,7 +156,7 @@ version is checked to be pixel-identical to the Python reference on every sample
 keeps an average of the model's features per letter (not your landmarks) and blends
 similarity to them into every prediction. With a model that never saw the test session,
 5 frames per letter took accuracy from **92.7% to 97.3%**, the weakest letter, K, from F1
-**0.14 to 0.96**, and the share of frames confident enough to commit a letter from **25% to
+**0.14 to 0.96**, and the share of frames confident enough to commit a letter (at the 0.90 threshold used then) from **25% to
 79%**, with none of the wrong guesses confident enough to commit (`docs/calibration_report.json`). Those calibration frames came from the same
 sitting as the test frames: that's how calibration is used, but it's the favourable case.
 
@@ -316,7 +316,7 @@ estimate for it. Results vary by about half a point between runs.
 ## 📁 Project Structure
 
 ```text
-Hand_Recognition/
+GestureFlow/
 ├── gestureflow/                 all the code
 │   ├── live.py                  ▶ webcam recognition + Ollama sentence generation
 │   ├── collect.py               ▶ record landmarks, prioritised by what the model gets wrong
@@ -333,12 +333,12 @@ Hand_Recognition/
 │   ├── export_onnx.py           ▶ export the CNN for Edge mode → models/gesture_cnn.onnx
 │   ├── edge.py                  ▶ Edge-mode renderer reference + Edge vs Server parity
 │   ├── calibration_eval.py      ▶ measure what calibration does for an unseen session
-│   ├── sentence.py              letters → sentence via local Ollama
+│   ├── sentence.py              letters → sentence via Ollama or Groq
 │   ├── splits.py                group-aware splits + leakage detector
 │   ├── detector.py              cvzone hand detector, model stored in models/
 │   └── paths.py                 every file location in one place
 │
-├── backend/                     FastAPI service (see docs/API.md)
+├── backend/                     FastAPI service
 │   ├── main.py                  app factory, /api/v1 routes
 │   ├── api/                     auth, recognition, gestures, sessions, calibration, analytics, ws
 │   ├── models.py                4 tables: users, sessions, committed letters, calibration
@@ -358,16 +358,13 @@ Hand_Recognition/
 │   ├── gesture_cnn.onnx/.json   the same model for the browser (Edge mode)
 │   └── hand_landmarker.task     MediaPipe model, downloaded on first run (not in git)
 ├── docs/
-│   ├── API.md                   endpoints, WebSocket protocol, latency, security
-│   ├── DEPLOY.md                putting it online (Neon, Groq, Hugging Face, Vercel)
-│   ├── EVALUATION.md            the train/test leak and how it was measured
 │   ├── evaluation_report.json   per-letter results, read by the collector
 │   ├── calibration_report.json  what calibration does, measured
 │   ├── edge_parity.json         Edge vs Server mode agreement, measured
 │   └── images/preview_mean.png  gesture reference image
 ├── tests/                       pytest suite, incl. golden vectors in tests/golden/
 │
-├── requirements.txt             every package at an exact version (generated from uv.lock)
+├── requirements.txt             every package at an exact version (hand-pinned for the Space)
 ├── pyproject.toml               direct dependencies and their allowed ranges
 ├── uv.lock                      resolved lockfile
 ├── .python-version              3.12
@@ -425,8 +422,8 @@ retraining requires no recollection.
 ### 1. Clone
 
 ```bash
-git clone https://github.com/AtharvaM25/Hand_Recognition.git
-cd Hand_Recognition
+git clone https://github.com/AtharvaM25/GestureFlow.git
+cd GestureFlow
 ```
 
 ### 2. Python version
@@ -453,21 +450,15 @@ python -m pip install -r requirements.txt
 
 On macOS / Linux use `python3.12 -m venv .venv` and `source .venv/bin/activate`.
 
-`requirements.txt` pins every package, including indirect ones, to one exact version. It is
-generated from `uv.lock`, so pip and uv install the same tree. Two pins prevent known clashes:
+`requirements.txt` pins every package, including indirect ones, to one exact version. It started
+as an export of `uv.lock`, but the Hugging Face Space installs it next to Gradio and ZeroGPU, so
+six packages are pinned lower by hand (pandas, pillow, pydantic, pydantic-core, starlette,
+websockets) and torch comes from PyPI. Two pins prevent known clashes:
 `opencv-python` and `opencv-contrib-python` (pulled in by MediaPipe) both provide `cv2` and are held
 at the same version, and MediaPipe is kept on 0.10.x, the line cvzone 2.x is built on. To change a
-dependency, edit `pyproject.toml`, then:
-
-```bash
-uv lock
-```
-
-```bash
-uv export --no-hashes --no-dev --no-emit-project --no-header -o requirements.txt
-```
-
-Re-add the comment header at the top of `requirements.txt` after exporting.
+dependency, edit `pyproject.toml` and run `uv lock`, then make the same change in
+`requirements.txt` by hand. Don't regenerate it with `uv export`: that removes the Space pins and
+breaks the deploy.
 
 On first run, cvzone downloads `hand_landmarker.task` (about 7.8 MB) into `models/`
 automatically. No manual step is needed, but the first launch requires an internet connection.
@@ -504,7 +495,7 @@ Run every program from the project folder (with `.venv` activated, or prefix wit
 
 ### Deploying it online
 
-[`docs/DEPLOY.md`](docs/DEPLOY.md) walks through putting it on the internet for free:
+The live version runs on free tiers:
 
 - **Neon** for PostgreSQL
 - **Groq** for sentence generation
